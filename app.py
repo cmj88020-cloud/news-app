@@ -6,8 +6,6 @@ st.set_page_config(page_title="외신 속보 요약", layout="wide")
 
 st.title("🌍 외신 속보 (한국어 요약)")
 
-translator = Translator()
-
 feeds = {
     "Reuters": "http://feeds.reuters.com/reuters/worldNews",
     "BBC": "http://feeds.bbci.co.uk/news/world/rss.xml"
@@ -15,19 +13,22 @@ feeds = {
 
 col1, col2 = st.columns(2)
 
+def translate_text(text):
+    try:
+        return GoogleTranslator(source='auto', target='ko').translate(text)
+    except:
+        return text
+
 def load_news(feed_url):
     news = []
     feed = feedparser.parse(feed_url)
 
     for entry in feed.entries[:5]:
-        try:
-            title = translator.translate(entry.title, dest='ko').text
-            summary = translator.translate(entry.summary, dest='ko').text
-        except:
-            title = entry.title
-            summary = entry.summary
+        title = translate_text(entry.title)
+        summary = translate_text(entry.summary)
 
         news.append((title, summary))
+
     return news
 
 with col1:
