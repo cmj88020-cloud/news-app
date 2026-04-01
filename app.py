@@ -1,6 +1,6 @@
 import streamlit as st
 import feedparser
-from googletrans import Translator
+from deep_translator import GoogleTranslator
 
 st.set_page_config(page_title="외신 속보 요약", layout="wide")
 
