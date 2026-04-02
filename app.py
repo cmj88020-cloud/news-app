@@ -2,13 +2,23 @@ import streamlit as st
 import feedparser
 import requests
 from deep_translator import GoogleTranslator
-from datetime import datetime
-from functools import lru_cache
+from datetime import datetime, timedelta
+import time
 
 st.set_page_config(page_title="외신 뉴스", layout="wide")
 
 # -------------------------
-# 캐싱 (핵심 성능 개선)
+# 자동 새로고침 (5분)
+# -------------------------
+if "last_refresh" not in st.session_state:
+    st.session_state.last_refresh = time.time()
+
+if time.time() - st.session_state.last_refresh > 300:
+    st.cache_data.clear()
+    st.session_state.last_refresh = time.time()
+
+# -------------------------
+# 캐싱
 # -------------------------
 @st.cache_data(ttl=600)
 def fetch_rss(url):
@@ -53,6 +63,7 @@ with col1:
 with col2:
     if st.button("🔄 새로고침"):
         st.cache_data.clear()
+        st.session_state.last_refresh = time.time()
 
 # -------------------------
 # 데이터 가져오기
@@ -60,7 +71,7 @@ with col2:
 feed = fetch_rss(RSS_FEEDS[category])
 
 # -------------------------
-# 카드 UI 스타일
+# 카드 스타일
 # -------------------------
 st.markdown("""
 <style>
@@ -83,6 +94,11 @@ st.markdown("""
     font-size: 12px;
     color: #666;
 }
+.breaking {
+    color: #ff4b4b;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -95,7 +111,6 @@ for entry in feed.entries[:10]:
     summary = entry.summary if "summary" in entry else ""
     link = entry.link
 
-    # 번역 (필요한 것만 → 성능 절약)
     title_ko = translate_text(title)
     summary_ko = translate_text(summary[:150])
 
@@ -104,9 +119,10 @@ for entry in feed.entries[:10]:
         published = datetime(*entry.published_parsed[:6])
         time_str = published.strftime("%m-%d %H:%M")
     except:
+        published = None
         time_str = ""
 
-    # 이미지 추출 (안정성 개선)
+    # 이미지 처리
     image_url = None
     if "media_content" in entry:
         image_url = entry.media_content[0]['url']
@@ -121,6 +137,10 @@ for entry in feed.entries[:10]:
     # 카드 출력
     # -------------------------
     st.markdown('<div class="card">', unsafe_allow_html=True)
+
+    # 🔥 속보 표시 (1시간 이내)
+    if published and published > datetime.now() - timedelta(hours=1):
+        st.markdown('<div class="breaking">🔥 속보</div>', unsafe_allow_html=True)
 
     cols = st.columns([1, 3])
 
