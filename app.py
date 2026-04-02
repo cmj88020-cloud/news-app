@@ -1,151 +1,139 @@
 import streamlit as st
 import feedparser
+import requests
 from deep_translator import GoogleTranslator
-import re
+from datetime import datetime
+from functools import lru_cache
 
-st.set_page_config(page_title="외신 속보", layout="wide")
+st.set_page_config(page_title="외신 뉴스", layout="wide")
 
-# 🎨 네이버 스타일 UI
-st.markdown("""
-<style>
-body {
-    background-color: #0e1117;
-}
-.card {
-    display: flex;
-    gap: 15px;
-    padding: 15px;
-    margin-bottom: 12px;
-    background-color: #111;
-    border-radius: 10px;
-    border: 1px solid #222;
-    align-items: center;
-}
-.card:hover {
-    background-color: #1a1a1a;
-}
-.thumb {
-    width: 120px;
-    height: 80px;
-    object-fit: cover;
-    border-radius: 6px;
-}
-.title {
-    color: white;
-    font-size: 16px;
-    font-weight: bold;
-}
-.summary {
-    color: #aaa;
-    font-size: 13px;
-}
-a {
-    text-decoration: none;
-}
-</style>
-""", unsafe_allow_html=True)
+# -------------------------
+# 캐싱 (핵심 성능 개선)
+# -------------------------
+@st.cache_data(ttl=600)
+def fetch_rss(url):
+    return feedparser.parse(url)
 
-st.title("📰 외신 속보")
-
-# 카테고리
-category = st.selectbox("카테고리", ["전체", "경제", "전쟁", "IT"])
-
-# 새로고침
-if st.button("🔄 새로고침"):
-    st.cache_data.clear()
-
-feeds = {
-    "🌍 World News": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
-    "📰 BBC": "http://feeds.bbci.co.uk/news/world/rss.xml"
-}
-
-col1, col2 = st.columns(2)
-
-# 번역
-def translate(text):
+@st.cache_data(ttl=600)
+def translate_text(text):
     try:
         return GoogleTranslator(source='auto', target='ko').translate(text)
     except:
         return text
 
-# 🔥 이미지 추출 (완벽 안정화 버전)
-def get_image(entry):
-    url = None
-
-    # 1. media_content
-    if "media_content" in entry:
-        url = entry.media_content[0].get("url")
-
-    # 2. links
-    if not url and "links" in entry:
-        for link in entry.links:
-            if link.get("type", "").startswith("image"):
-                url = link.get("href")
-                break
-
-    # 3. summary (BBC 대응)
-    if not url and "summary" in entry:
-        match = re.search(r'<img.*?src="(.*?)"', entry.summary)
-        if match:
-            url = match.group(1)
-
-    # 4. URL 보정
-    if url and url.startswith("//"):
-        url = "https:" + url
-
-    # 5. 유효성 체크
-    if not url or not url.startswith("http"):
+@st.cache_data(ttl=600)
+def get_image(url):
+    try:
+        r = requests.get(url, timeout=5)
+        if r.status_code == 200:
+            return url
+    except:
         return None
+    return None
 
-    return url
+# -------------------------
+# RSS 목록
+# -------------------------
+RSS_FEEDS = {
+    "경제": "https://rss.nytimes.com/services/xml/rss/nyt/Economy.xml",
+    "전쟁": "http://feeds.bbci.co.uk/news/world/rss.xml",
+    "IT": "https://rss.nytimes.com/services/xml/rss/nyt/Technology.xml"
+}
 
-# 카테고리 필터
-def match_category(text):
-    text = text.lower()
-    if category == "전체":
-        return True
-    if category == "경제":
-        return any(x in text for x in ["economy", "market", "finance"])
-    if category == "전쟁":
-        return any(x in text for x in ["war", "military", "attack"])
-    if category == "IT":
-        return any(x in text for x in ["tech", "ai", "software"])
-    return True
+# -------------------------
+# UI 상단
+# -------------------------
+st.title("🌍 외신 뉴스")
 
-# 뉴스 출력
-def show(title, url):
-    st.subheader(title)
-    news = feedparser.parse(url).entries[:8]
-
-    for entry in news:
-        title_en = entry.get("title", "")
-        summary_en = entry.get("summary", entry.get("description", ""))
-
-        if not match_category(title_en + summary_en):
-            continue
-
-        t = translate(title_en)
-        s = translate(summary_en)
-        link = entry.get("link", "")
-        img = get_image(entry)
-
-        # 🔥 이미지 fallback
-        img_url = img if img else "https://via.placeholder.com/120x80?text=No+Image"
-
-        st.markdown(f"""
-        <a href="{link}" target="_blank">
-            <div class="card">
-                <img class="thumb" src="{img_url}">
-                <div>
-                    <div class="title">{t}</div>
-                    <div class="summary">{s[:100]}...</div>
-                </div>
-            </div>
-        </a>
-        """, unsafe_allow_html=True)
+col1, col2 = st.columns([3,1])
 
 with col1:
-    show("🌍 World News", feeds["🌍 World News"])
+    category = st.selectbox("카테고리 선택", list(RSS_FEEDS.keys()))
 
 with col2:
-    show("📰 BBC", feeds["📰 BBC"])
+    if st.button("🔄 새로고침"):
+        st.cache_data.clear()
+
+# -------------------------
+# 데이터 가져오기
+# -------------------------
+feed = fetch_rss(RSS_FEEDS[category])
+
+# -------------------------
+# 카드 UI 스타일
+# -------------------------
+st.markdown("""
+<style>
+.card {
+    border-radius: 12px;
+    padding: 12px;
+    margin-bottom: 15px;
+    background-color: #111;
+    border: 1px solid #222;
+}
+.title {
+    font-size: 18px;
+    font-weight: bold;
+}
+.summary {
+    font-size: 14px;
+    color: #aaa;
+}
+.time {
+    font-size: 12px;
+    color: #666;
+}
+</style>
+""", unsafe_allow_html=True)
+
+# -------------------------
+# 뉴스 출력
+# -------------------------
+for entry in feed.entries[:10]:
+
+    title = entry.title
+    summary = entry.summary if "summary" in entry else ""
+    link = entry.link
+
+    # 번역 (필요한 것만 → 성능 절약)
+    title_ko = translate_text(title)
+    summary_ko = translate_text(summary[:150])
+
+    # 시간 처리
+    try:
+        published = datetime(*entry.published_parsed[:6])
+        time_str = published.strftime("%m-%d %H:%M")
+    except:
+        time_str = ""
+
+    # 이미지 추출 (안정성 개선)
+    image_url = None
+    if "media_content" in entry:
+        image_url = entry.media_content[0]['url']
+    elif "links" in entry:
+        for link_item in entry.links:
+            if "image" in link_item.get("type", ""):
+                image_url = link_item.href
+
+    image_url = get_image(image_url) if image_url else None
+
+    # -------------------------
+    # 카드 출력
+    # -------------------------
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+
+    cols = st.columns([1, 3])
+
+    with cols[0]:
+        if image_url:
+            st.image(image_url, use_container_width=True)
+        else:
+            st.image("https://via.placeholder.com/150", use_container_width=True)
+
+    with cols[1]:
+        st.markdown(f'<div class="title">{title_ko}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="summary">{summary_ko}...</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="time">{time_str}</div>', unsafe_allow_html=True)
+        st.link_button("기사 보기", link)
+
+    st.markdown('</div>', unsafe_allow_html=True)
