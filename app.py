@@ -4,7 +4,7 @@ from deep_translator import GoogleTranslator
 
 st.set_page_config(page_title="외신 속보", layout="wide")
 
-# 🎨 디자인
+# 🎨 스타일
 st.markdown("""
 <style>
 .news-card {
@@ -18,11 +18,10 @@ st.markdown("""
 
 st.title("🌍 외신 속보 (한국어 요약)")
 
-# 🔥 안정적인 RSS
+# 🔥 안정적으로 되는 RSS (Reuters 대신 NYT 사용)
 feeds = {
-   feeds = {
-    "World News": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
-    "BBC": "http://feeds.bbci.co.uk/news/world/rss.xml"
+    "📰 World News (NYT)": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+    "📰 BBC": "http://feeds.bbci.co.uk/news/world/rss.xml"
 }
 
 col1, col2 = st.columns(2)
@@ -34,19 +33,17 @@ def translate(text):
     except:
         return text
 
-# 뉴스 불러오기 (안정화)
+# 뉴스 불러오기
 def load(feed_url):
     news = feedparser.parse(feed_url)
-    
     if not news.entries:
         return []
-    
     return news.entries[:5]
 
-# 출력 함수
+# 뉴스 출력
 def show(title, url):
     st.subheader(title)
-    
+
     news_list = load(url)
 
     if not news_list:
@@ -66,7 +63,7 @@ def show(title, url):
         """, unsafe_allow_html=True)
 
 with col1:
-    show("📰 Reuters", feeds["Reuters"])
+    show("🌎 World News", feeds["📰 World News (NYT)"])
 
 with col2:
-    show("📰 BBC", feeds["BBC"])
+    show("📰 BBC", feeds["📰 BBC"])
