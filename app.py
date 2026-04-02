@@ -20,7 +20,8 @@ st.title("🌍 외신 속보 (한국어 요약)")
 
 # 🔥 안정적인 RSS
 feeds = {
-    "Reuters": "http://feeds.reuters.com/reuters/worldNews",
+   feeds = {
+    "World News": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
     "BBC": "http://feeds.bbci.co.uk/news/world/rss.xml"
 }
 
