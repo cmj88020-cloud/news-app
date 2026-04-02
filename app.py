@@ -1,47 +1,62 @@
 import streamlit as st
 import feedparser
 from deep_translator import GoogleTranslator
+import re
 
 st.set_page_config(page_title="외신 속보", layout="wide")
 
-# 🎨 흑백 스타일
+# 🎨 네이버 스타일 UI
 st.markdown("""
 <style>
 body {
     background-color: #0e1117;
 }
-.news-card {
-    background-color: #111;
+.card {
+    display: flex;
+    gap: 15px;
     padding: 15px;
+    margin-bottom: 12px;
+    background-color: #111;
     border-radius: 10px;
-    margin-bottom: 15px;
-    border: 1px solid #333;
+    border: 1px solid #222;
+    align-items: center;
 }
-.news-title {
-    color: #fff;
+.card:hover {
+    background-color: #1a1a1a;
+}
+.thumb {
+    width: 120px;
+    height: 80px;
+    object-fit: cover;
+    border-radius: 6px;
+}
+.title {
+    color: white;
+    font-size: 16px;
     font-weight: bold;
 }
-.news-summary {
-    color: #ccc;
+.summary {
+    color: #aaa;
+    font-size: 13px;
+}
+a {
+    text-decoration: none;
 }
 </style>
 """, unsafe_allow_html=True)
 
-st.title("📰 외신 속보 (한국어 요약)")
+st.title("📰 외신 속보")
 
-# 카테고리 선택
-category = st.selectbox(
-    "카테고리 선택",
-    ["전체", "경제", "전쟁", "IT"]
-)
+# 카테고리
+category = st.selectbox("카테고리", ["전체", "경제", "전쟁", "IT"])
 
 # 새로고침
 if st.button("🔄 새로고침"):
     st.cache_data.clear()
 
 feeds = {
-    "World News": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
-    "BBC": "http://feeds.bbci.co.uk/news/world/rss.xml"
+    "🌍 World News": "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",
+    "📰 BBC": "http://feeds.bbci.co.uk/news/world/rss.xml"
 }
 
 col1, col2 = st.columns(2)
@@ -53,14 +68,21 @@ def translate(text):
     except:
         return text
 
-# 썸네일
+# 썸네일 추출 (BBC 포함)
 def get_image(entry):
     if "media_content" in entry:
         return entry.media_content[0]["url"]
+
     if "links" in entry:
         for link in entry.links:
             if link.get("type", "").startswith("image"):
                 return link.get("href")
+
+    if "summary" in entry:
+        match = re.search(r'<img.*?src="(.*?)"', entry.summary)
+        if match:
+            return match.group(1)
+
     return None
 
 # 카테고리 필터
@@ -93,20 +115,21 @@ def show(title, url):
         link = entry.get("link", "")
         img = get_image(entry)
 
-        if img:
-            st.image(img, use_container_width=True)
-
+        # 카드 UI
         st.markdown(f"""
-        <div class="news-card">
-            <div class="news-title">
-                <a href="{link}" target="_blank" style="color:white;">{t}</a>
+        <a href="{link}" target="_blank">
+            <div class="card">
+                <img class="thumb" src="{img if img else 'https://via.placeholder.com/120x80'}">
+                <div>
+                    <div class="title">{t}</div>
+                    <div class="summary">{s[:100]}...</div>
+                </div>
             </div>
-            <div class="news-summary">{s}</div>
-        </div>
+        </a>
         """, unsafe_allow_html=True)
 
 with col1:
-    show("🌍 World News", feeds["World News"])
+    show("🌍 World News", feeds["🌍 World News"])
 
 with col2:
-    show("📰 BBC", feeds["BBC"])
+    show("📰 BBC", feeds["📰 BBC"])
