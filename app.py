@@ -18,7 +18,7 @@ st.markdown("""
 st.title("🌍 외신 속보 (한국어 요약)")
 
 feeds = {
-    "Reuters": "https://www.reutersagency.com/feed/?best-topics=world&post_type=best",
+    "Reuters": "https://feeds.reuters.com/Reuters/worldNews",
     "BBC": "http://feeds.bbci.co.uk/news/world/rss.xml"
 }
 
