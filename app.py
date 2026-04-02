@@ -68,22 +68,36 @@ def translate(text):
     except:
         return text
 
-# 썸네일 추출 (BBC 포함)
+# 🔥 이미지 추출 (완벽 안정화 버전)
 def get_image(entry):
-    if "media_content" in entry:
-        return entry.media_content[0]["url"]
+    url = None
 
-    if "links" in entry:
+    # 1. media_content
+    if "media_content" in entry:
+        url = entry.media_content[0].get("url")
+
+    # 2. links
+    if not url and "links" in entry:
         for link in entry.links:
             if link.get("type", "").startswith("image"):
-                return link.get("href")
+                url = link.get("href")
+                break
 
-    if "summary" in entry:
+    # 3. summary (BBC 대응)
+    if not url and "summary" in entry:
         match = re.search(r'<img.*?src="(.*?)"', entry.summary)
         if match:
-            return match.group(1)
+            url = match.group(1)
 
-    return None
+    # 4. URL 보정
+    if url and url.startswith("//"):
+        url = "https:" + url
+
+    # 5. 유효성 체크
+    if not url or not url.startswith("http"):
+        return None
+
+    return url
 
 # 카테고리 필터
 def match_category(text):
@@ -115,11 +129,13 @@ def show(title, url):
         link = entry.get("link", "")
         img = get_image(entry)
 
-        # 카드 UI
+        # 🔥 이미지 fallback
+        img_url = img if img else "https://via.placeholder.com/120x80?text=No+Image"
+
         st.markdown(f"""
         <a href="{link}" target="_blank">
             <div class="card">
-                <img class="thumb" src="{img if img else 'https://via.placeholder.com/120x80'}">
+                <img class="thumb" src="{img_url}">
                 <div>
                     <div class="title">{t}</div>
                     <div class="summary">{s[:100]}...</div>
