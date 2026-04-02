@@ -4,6 +4,7 @@ from deep_translator import GoogleTranslator
 
 st.set_page_config(page_title="외신 속보", layout="wide")
 
+# 🎨 디자인
 st.markdown("""
 <style>
 .news-card {
@@ -17,29 +18,44 @@ st.markdown("""
 
 st.title("🌍 외신 속보 (한국어 요약)")
 
+# 🔥 안정적인 RSS
 feeds = {
-    "Reuters": "https://feeds.reuters.com/Reuters/worldNews",
+    "Reuters": "http://feeds.reuters.com/reuters/worldNews",
     "BBC": "http://feeds.bbci.co.uk/news/world/rss.xml"
 }
 
 col1, col2 = st.columns(2)
 
+# 번역 함수
 def translate(text):
     try:
         return GoogleTranslator(source='auto', target='ko').translate(text)
     except:
         return text
 
+# 뉴스 불러오기 (안정화)
 def load(feed_url):
     news = feedparser.parse(feed_url)
+    
+    if not news.entries:
+        return []
+    
     return news.entries[:5]
 
+# 출력 함수
 def show(title, url):
     st.subheader(title)
-    for entry in load(url):
-        t = translate(entry.title)
-        s = translate(entry.summary)
-        link = entry.link
+    
+    news_list = load(url)
+
+    if not news_list:
+        st.write("❌ 뉴스 불러오기 실패")
+        return
+
+    for entry in news_list:
+        t = translate(entry.get("title", ""))
+        s = translate(entry.get("summary", entry.get("description", "")))
+        link = entry.get("link", "")
 
         st.markdown(f"""
         <div class="news-card">
