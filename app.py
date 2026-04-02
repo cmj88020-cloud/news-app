@@ -2,10 +2,15 @@ import streamlit as st
 import feedparser
 import requests
 from deep_translator import GoogleTranslator
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 
 st.set_page_config(page_title="외신 뉴스", layout="wide")
+
+# -------------------------
+# KST 설정
+# -------------------------
+KST = timezone(timedelta(hours=9))
 
 # -------------------------
 # 자동 새로고침 (5분)
@@ -72,23 +77,17 @@ feed = fetch_rss(RSS_FEEDS[category])
 # -------------------------
 st.markdown("""
 <style>
-.card {
-    border-radius: 12px;
-    padding: 12px;
-    margin-bottom: 15px;
-    background-color: #111;
-    border: 1px solid #222;
-}
-.title { font-size:18px; font-weight:bold; }
-.summary { font-size:14px; color:#aaa; }
-.time { font-size:12px; color:#666; }
-.breaking { color:#ff4b4b; font-weight:bold; }
-.core { color:#00c853; font-weight:bold; }
+.card {border-radius:12px;padding:12px;margin-bottom:15px;background:#111;border:1px solid #222;}
+.title {font-size:18px;font-weight:bold;}
+.summary {font-size:14px;color:#aaa;}
+.time {font-size:12px;color:#666;}
+.breaking {color:#ff4b4b;font-weight:bold;}
+.core {color:#00c853;font-weight:bold;}
 </style>
 """, unsafe_allow_html=True)
 
 # -------------------------
-# 핵심 요약 함수
+# 요약 함수
 # -------------------------
 def make_core(text):
     t = text.replace("\n", " ")
@@ -99,25 +98,22 @@ def make_context(text):
     return t[:120] + "..." if len(t) > 120 else t
 
 # -------------------------
-# 중요도 계산 (핵심)
+# 중요도 계산
 # -------------------------
 def score_news(entry):
     score = 0
     text = (entry.title + " " + entry.summary).lower()
 
-    keywords = [
-        "war","attack","china","russia","inflation","fed",
-        "ai","nvidia","tesla","crisis","oil","rate"
-    ]
+    keywords = ["war","attack","china","russia","inflation","fed","ai","nvidia","tesla","crisis","oil","rate"]
 
     for k in keywords:
         if k in text:
             score += 2
 
-    # 최신 뉴스 가중치
     try:
-        published = datetime(*entry.published_parsed[:6])
-        if published > datetime.now() - timedelta(hours=6):
+        published = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
+        published_kst = published.astimezone(KST)
+        if published_kst > datetime.now(KST) - timedelta(hours=6):
             score += 3
     except:
         pass
@@ -125,21 +121,17 @@ def score_news(entry):
     return score
 
 # -------------------------
-# TOP5 선정
+# TOP5
 # -------------------------
 entries = feed.entries[:20]
 sorted_entries = sorted(entries, key=score_news, reverse=True)
 top5 = sorted_entries[:5]
 
-# -------------------------
-# 🔥 TOP5 출력
-# -------------------------
 st.subheader("🔥 중요 뉴스 TOP5")
 
 for entry in top5:
     title_ko = translate_text(entry.title)
     summary_ko = translate_text(entry.summary[:150])
-
     core = make_core(summary_ko)
 
     st.markdown(f"👉 **{title_ko}**")
@@ -163,12 +155,13 @@ for entry in entries[:10]:
     core = make_core(summary_ko)
     context = make_context(summary_ko)
 
-    # 시간
+    # ✅ KST 시간 변환
     try:
-        published = datetime(*entry.published_parsed[:6])
-        time_str = published.strftime("%m-%d %H:%M")
+        published = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
+        published_kst = published.astimezone(KST)
+        time_str = published_kst.strftime("%m-%d %H:%M")
     except:
-        published = None
+        published_kst = None
         time_str = ""
 
     # 이미지
@@ -177,10 +170,10 @@ for entry in entries[:10]:
         image_url = entry.media_content[0]['url']
     image_url = get_image(image_url) if image_url else None
 
-    # 카드
     st.markdown('<div class="card">', unsafe_allow_html=True)
 
-    if published and published > datetime.now() - timedelta(hours=1):
+    # ✅ 속보 (KST 기준)
+    if published_kst and published_kst > datetime.now(KST) - timedelta(hours=1):
         st.markdown('<div class="breaking">🔥 속보</div>', unsafe_allow_html=True)
 
     cols = st.columns([1,3])
